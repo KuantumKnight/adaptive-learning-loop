@@ -1,0 +1,2 @@
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS software_revision TEXT NOT NULL DEFAULT 'unknown';
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS policy_config TEXT NOT NULL DEFAULT '{}';

@@ -1,0 +1,5 @@
+# Isolated override used only by scripts/verify-postgres.ps1.
+# It removes host port bindings so a local development API can stay running.
+services:
+  backend:
+    ports: []

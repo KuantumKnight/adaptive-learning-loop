@@ -1,0 +1,4 @@
+session_id,participant_code,session_kind,mode,lesson_id,data_origin,content_version,policy_version,record_type,phase,concept,correct,intervention_kind,intervention_status,follow_up_correct,selection_reason,completeness
+synthetic-demo-personalized-001,SYNTHETIC-DEMO,practice,personalized,binary-search,synthetic_demo,v2,v2,answer,checkpoint,binary-search,0,simplified,completed,,initial default,complete
+synthetic-demo-personalized-001,SYNTHETIC-DEMO,practice,personalized,binary-search,synthetic_demo,v2,v2,intervention,,binary-search,,simplified,completed,1/2,initial default,complete
+synthetic-demo-personalized-001,SYNTHETIC-DEMO,practice,personalized,binary-search,synthetic_demo,v2,v2,next-session-choice,,binary-search,,worked_example,offered,,exploration of an unused support type,complete

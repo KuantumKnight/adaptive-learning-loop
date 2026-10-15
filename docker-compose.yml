@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: idp
+      POSTGRES_USER: idp
+      POSTGRES_PASSWORD: idp
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U idp -d idp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    working_dir: /app
+    volumes:
+      - ./backend:/app/backend
+      - ./data:/app/data
+    environment:
+      IDP_DATABASE_URL: postgresql+psycopg://idp:idp@db:5432/idp
+    command: uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      db:
+        condition: service_healthy
+  frontend:
+    image: node:22-slim
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - frontend_node_modules:/app/node_modules
+    command: sh -c "npm ci --no-audit --no-fund && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+volumes:
+  frontend_node_modules:
+  postgres_data:

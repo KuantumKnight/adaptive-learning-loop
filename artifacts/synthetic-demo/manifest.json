@@ -1,0 +1,10 @@
+{
+  "data_origin": "synthetic_demo",
+  "participant_code": "SYNTHETIC-DEMO",
+  "session_id": "synthetic-demo-personalized-001",
+  "purpose": "Rehearse the technical personalized-support demonstration only.",
+  "human_participant": false,
+  "include_in_study_summary": false,
+  "generated_by": "scripts/generate-synthetic-demo.py",
+  "warning": "This file contains invented values and must never be reported as a participant result."
+}
