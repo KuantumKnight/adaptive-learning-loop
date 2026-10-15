@@ -2,9 +2,9 @@
 
 ## Technical project report
 
-**Evidence cut-off:** 2026-09-23  
-**Software version:** content `v2`, policy `v2`  
-**Study status:** technical validation complete; human-study findings pending
+**Evidence cut-off:** 2026-10-15<br>
+**Software version:** content `v2`, policy `v2`; Git revision recorded per hosted session<br>
+**Study status:** technical validation in progress; human-study findings pending
 
 ## Abstract
 
@@ -22,8 +22,10 @@ signals reveal confusion or that personalization causes learning gains.
 The learner interface is a React, TypeScript, and Vite application. FastAPI
 provides lesson, session, progress, event, assessment, intervention, feedback,
 research, and export endpoints. SQLite is the local convenience database;
-PostgreSQL is configured through SQLAlchemy and Docker Compose for acceptance
-deployment. Versioned migrations include personalization aggregates, feedback,
+PostgreSQL is hosted on separate free-plan Neon production and preview databases
+through Vercel Services; SQLite remains the local development database. Schema
+preparation is an explicit serialized release command, separate from hosted
+instance startup. Versioned migrations include personalization aggregates, feedback,
 section visits, one-active-intervention protection, and repeat follow-up banks.
 
 MediaPipe Face Landmarker runs in a browser worker using locally served pinned
@@ -77,7 +79,7 @@ return canonical saved results.
 
 ## Technical verification
 
-The current automated suite contains **24 passing backend tests**. It covers:
+The current SQLite suite contains **26 passing backend tests** and six behavior-metric tests. It covers:
 
 - server-side grading and hidden answer keys;
 - all lesson and comparison-mode combinations;
@@ -89,7 +91,7 @@ The current automated suite contains **24 passing backend tests**. It covers:
 - provenance-safe exports, raw-camera rejection, and researcher access;
 - terminal session protection and health endpoints.
 
-The production frontend build passes. The live browser matrix completed all nine
+The production frontend build passes. A previous local browser matrix completed all nine
 lesson/mode combinations. A browser retention session completed three retention
 questions and reached the results surface. A worker initialized the pinned local
 model successfully, a blank frame produced no face, and an invalid model asset
@@ -102,16 +104,20 @@ audit reported zero axe violations; full screen-reader review remains pending.
 Run the local stack with the commands in `README.md`, then run:
 
 ```powershell
-pytest backend/tests -q
+pytest backend/tests/test_api.py -q
+npm run test:behavior
 npm run build
+npm run test:browser
 .\scripts\verify-postgres.ps1
 ```
 
-The PostgreSQL verifier uses an isolated Compose project, creates a session,
-restarts PostgreSQL and FastAPI, and confirms that the session survives. Its
-current result is `blocked_external` because Docker Desktop’s Linux engine is
-not available in the validation environment. The local API and frontend remain
-usable through SQLite and Vite.
+The PostgreSQL integration test passed against the distinct Neon preview
+database on 2026-10-15. It repeated clean preparation, sent simultaneous help
+requests, verified one active intervention, completed both follow-ups, checked
+the aggregate, and read the completed record through a new API client. The
+older Docker Compose restart verifier remains blocked because Docker Desktop’s
+Linux engine is unavailable locally. A live deployment/redeployment persistence
+check is tracked separately in release evidence.
 
 For a rehearsal without participant data, run:
 
@@ -126,9 +132,12 @@ result.
 ## Human evaluation status
 
 No volunteer findings are reported in this document. The planned pilot uses
-three to six consenting adults, participant codes, rotated lesson-to-mode
-assignments, separate practice and measured sessions, optional webcam consent,
-and an optional retention check 48–72 hours later. The pilot run sheet,
+three consenting adults and a fixed nine-pairing lesson/mode rotation. Every
+participant receives the same camera-free controls tutorial and one completed
+support interaction on their personalized lesson in a separate practice
+session. Measured sessions keep the camera off; camera behavior is checked
+separately with consent. The extra personalized exposure is a limitation.
+Optional retention checks 48–72 hours later remain outside primary charts. The pilot run sheet,
 consent wording, feedback questions, data dictionary, and assignment rotation
 are in `EVALUATION.md`.
 
@@ -141,8 +150,8 @@ Observable webcam context is not a mental-state label. Legacy records retain a
 `legacy_unverified` provenance value, and synthetic rehearsal data remains
 separate from study exports.
 
-Before final academic submission, a team member must run the PostgreSQL
-acceptance script with Docker available, validate camera behavior with suitable
-consenting hardware, conduct the volunteer sessions, replace pending report
-sections with observed exports, complete the unresolved citation audit, and
-record the final demonstration.
+Before final academic submission, the team must validate camera behavior with
+consenting hardware, conduct the volunteer sessions after institutional
+guidance and study-build freeze, replace pending findings with reconciled
+observed exports, complete the unresolved citation audit, and record the final
+demonstration. Synthetic examples are never substituted for volunteer results.

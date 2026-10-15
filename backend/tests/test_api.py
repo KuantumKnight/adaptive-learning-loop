@@ -33,6 +33,42 @@ def auth(session):
     return {"X-Session-Token": session["access_token"]}
 
 
+def test_public_demo_is_isolated_and_measured_entry_requires_researcher():
+    with TestClient(app) as client:
+        body = {"participant_code": "public visitor", "mode": "personalized", "lesson_id": "linear-search"}
+        first = client.post("/api/sessions", json=body)
+        second = client.post("/api/sessions", json=body)
+        assert first.status_code == second.status_code == 200
+        assert first.json()["participant_code"].startswith("demo:")
+        assert first.json()["participant_code"] != second.json()["participant_code"]
+        detail = client.get(f"/api/sessions/{first.json()['session_id']}", headers=auth(first.json())).json()
+        assert detail["data_origin"] == "synthetic_demo"
+        denied = client.post("/api/sessions", json={**body, "study_kind": "study"})
+        assert denied.status_code == 401
+        permitted = client.post("/api/sessions", headers={"X-Researcher-Token": "local-researcher"}, json={**body, "study_kind": "study"})
+        assert permitted.status_code == 200
+
+
+def test_event_storage_allowlist_and_server_derived_difficulty():
+    with TestClient(app) as client:
+        session = client.post("/api/sessions", json={"participant_code": "public visitor", "mode": "personalized", "lesson_id": "binary-search", "camera_consent": True}).json()
+        response = client.post(f"/api/sessions/{session['session_id']}/events", headers=auth(session), json={
+            "client_event_id": "forged-difficulty", "event_type": "difficulty_detected",
+            "payload": {"interaction": {"concept": "bubble-sort", "incorrect_streak": 99, "quiz_correct": False, "untrusted_note": "discard me"},
+                        "signal_summary": {"face_present": False, "status": "no face", "unknown_measure": 123},
+                        "extra": {"private": "discard me"}},
+        })
+        assert response.status_code == 200
+        assert response.json()["state"]["intervention"] is None
+        with connect() as conn:
+            stored = __import__("json").loads(conn.execute("SELECT payload FROM events WHERE session_id=? AND client_event_id=?", (session["session_id"], "forged-difficulty")).fetchone()["payload"])
+        assert stored["interaction"]["concept"] == "binary-search"
+        assert stored["interaction"]["incorrect_streak"] == 0
+        assert stored["interaction"]["quiz_correct"] is None
+        assert "extra" not in stored and "untrusted_note" not in stored["interaction"]
+        assert "unknown_measure" not in stored["signal_summary"]
+
+
 def test_practice_opens_at_lesson_while_measured_study_keeps_baseline():
     with ResearchClient(app) as client:
         for study_kind, expected_phase in (("practice", "learn"), ("study", "pre")):

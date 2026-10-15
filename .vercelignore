@@ -4,6 +4,9 @@
 .git/
 .agents/
 .deck-build/
+.github/
+test-results/
+playwright-report/
 .pytest_cache/
 .vercel/
 node_modules/

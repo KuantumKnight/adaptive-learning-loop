@@ -30,7 +30,7 @@ async def lifespan(_app: FastAPI):
 app = FastAPI(title="Adaptive Learning Loop API", version="1.0.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://127.0.0.1:5193"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -47,7 +47,7 @@ PILOT_ASSIGNMENTS = [
     {"participant_code": "P02", "session_1": "Rule-based · Bubble", "session_2": "Personalized · Linear", "session_3": "Static · Binary"},
     {"participant_code": "P03", "session_1": "Personalized · Binary", "session_2": "Static · Bubble", "session_3": "Rule-based · Linear"},
 ]
-SOFTWARE_REVISION = (os.getenv("IDP_SOFTWARE_REVISION") or os.getenv("VERCEL_GIT_COMMIT_SHA") or "local-development")
+SOFTWARE_REVISION = (os.getenv("VERCEL_GIT_COMMIT_SHA") or os.getenv("IDP_SOFTWARE_REVISION") or "local-development")
 POLICY_CONFIG = {"look_away_seconds": LOOK_AWAY_SECONDS, "response_time_ms": RESPONSE_TIME_MS, "cooldown_seconds": COOLDOWN_SECONDS}
 
 
@@ -593,9 +593,9 @@ def respond_intervention(session_id: str, intervention_id: int, body: Interventi
         }
         status, timestamp_column = transitions[body.action]
         if timestamp_column == "accepted":
-            conn.execute("UPDATE interventions SET accepted=1, status='accepted', viewed_at=COALESCE(viewed_at, CURRENT_TIMESTAMP) WHERE id=?", (intervention_id,))
+            conn.execute("UPDATE interventions SET accepted=1, status='accepted', viewed_at=COALESCE(viewed_at, CAST(CURRENT_TIMESTAMP AS TEXT)) WHERE id=?", (intervention_id,))
         elif timestamp_column == "viewed_at":
-            conn.execute("UPDATE interventions SET status=CASE WHEN status='offered' THEN 'viewed' ELSE status END, viewed_at=COALESCE(viewed_at, CURRENT_TIMESTAMP) WHERE id=?", (intervention_id,))
+            conn.execute("UPDATE interventions SET status=CASE WHEN status='offered' THEN 'viewed' ELSE status END, viewed_at=COALESCE(viewed_at, CAST(CURRENT_TIMESTAMP AS TEXT)) WHERE id=?", (intervention_id,))
         else:
             conn.execute(f"UPDATE interventions SET status=?, {timestamp_column}=CURRENT_TIMESTAMP, accepted=? WHERE id=?", (status, 0, intervention_id))
         updated = conn.execute("SELECT status, accepted FROM interventions WHERE id=?", (intervention_id,)).fetchone()
@@ -641,8 +641,8 @@ def add_follow_up(session_id: str, intervention_id: int, body: FollowUpCreate, x
                        (participant_id, reset_group, mode, concept, kind, completed_interventions, outcome_sum)
                        VALUES (?, ?, ?, ?, ?, 1, ?)
                        ON CONFLICT(participant_id, reset_group, mode, concept, kind)
-                       DO UPDATE SET completed_interventions=completed_interventions + excluded.completed_interventions,
-                                     outcome_sum=outcome_sum + excluded.outcome_sum,
+                       DO UPDATE SET completed_interventions=personalization_aggregates.completed_interventions + excluded.completed_interventions,
+                                     outcome_sum=personalization_aggregates.outcome_sum + excluded.outcome_sum,
                                      updated_at=CURRENT_TIMESTAMP""",
                     (session["participant_id"], session["reset_group"], session["mode"], intervention["concept"], intervention["kind"], outcome_sum),
                 )

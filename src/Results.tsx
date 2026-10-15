@@ -124,7 +124,7 @@ export default function Results({
             <span>support offered</span>
           </div>
           <div>
-            <strong>{lifecycle("accepted")}</strong>
+            <strong>{interventions.filter((item) => Boolean(item.accepted)).length}</strong>
             <span>accepted</span>
           </div>
           <div>

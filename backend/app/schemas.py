@@ -46,7 +46,7 @@ class EventPayload(BaseModel):
 
 class EventCreate(BaseModel):
     client_event_id: str = Field(min_length=1, max_length=100)
-    event_type: str = Field(min_length=1, max_length=60)
+    event_type: Literal["difficulty_detected", "help_requested", "signal_summary"]
     payload: dict[str, Any] = Field(default_factory=dict)
 
 

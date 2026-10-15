@@ -78,3 +78,16 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
   .visualizer-preview .visualizer-controls label { min-width: 0; }
   .visualizer-preview .visualizer-controls label:first-child { grid-column: 1 / -1; }
 }
+
+.intervention-card { max-height: calc(100dvh - 32px); overflow-y: auto; }
+.modal-actions, .result-actions, .visualizer-controls { flex-wrap: wrap; }
+.intervention-card .option-list button, .modal-actions button { min-height: 44px; }
+@media (max-width: 520px) {
+  .modal-backdrop { padding: 12px; }
+  .intervention-card { padding: 22px; box-shadow: 5px 5px 0 #dfe8e1; }
+  .intervention-card h2 { font-size: 28px; }
+  .modal-actions { justify-content: stretch; }
+  .modal-actions button { flex: 1 1 100%; }
+  .result-actions > * { flex: 1 1 100%; }
+  .visualizer-controls { align-items: stretch; }
+}

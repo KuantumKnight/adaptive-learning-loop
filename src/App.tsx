@@ -15,6 +15,8 @@ import ResearchWorkspace from "./ResearchWorkspace";
 import AlgorithmVisualizer from "./AlgorithmVisualizer";
 import InterventionModal from "./InterventionModal";
 import Results from "./Results";
+import { useSessionSync } from "./useSessionSync";
+import { useSessionRecovery } from "./useSessionRecovery";
 
 const modeCopy: Record<Mode, { label: string; detail: string }> = {
   static: {
@@ -36,7 +38,7 @@ function formatDegrees(value: number | null) {
 
 export default function App() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [session, setSession] = useState<Session | null>(null);
+  const { session, setSession, exit } = useSessionRecovery();
   const [error, setError] = useState("");
   const [research, setResearch] = useState(false);
   useEffect(() => {
@@ -44,18 +46,6 @@ export default function App() {
       .lessons()
       .then(setLessons)
       .catch((e) => setError(e.message));
-    try {
-      const saved = localStorage.getItem("idp.session");
-      if (saved) {
-        const parsed = JSON.parse(saved) as Session;
-        if (parsed?.session_id && parsed?.access_token) {
-          api.setSessionToken(parsed.access_token);
-          setSession(parsed);
-        }
-      }
-    } catch {
-      localStorage.removeItem("idp.session");
-    }
   }, []);
   if (session) {
     const lesson = lessons.find((l) => l.id === session.lesson_id);
@@ -67,10 +57,7 @@ export default function App() {
         session={session}
         lesson={lesson}
         onStartSession={setSession}
-        onExit={() => {
-          localStorage.removeItem("idp.session");
-          setSession(null);
-        }}
+        onExit={exit}
       />
     );
   }
@@ -299,7 +286,8 @@ function LessonRunner({
   const [incorrectStreak, setIncorrectStreak] = useState(0);
   const [answerBusy, setAnswerBusy] = useState(false);
   const answerInFlight = useRef(false);
-  const progressInFlight = useRef(false);
+  const signalInFlight = useRef(false);
+  const progressSync = useSessionSync(session.session_id);
   const restored = useRef(false);
   const currentPhase = useRef(phase);
   const currentQuestionIndex = useRef(questionIndex);
@@ -324,11 +312,9 @@ function LessonRunner({
   }, [phase, questionIndex, section, activeSeconds, elapsed]);
   useEffect(() => {
     const t = window.setInterval(() => {
-      if (!restored.current || currentPhase.current === "done" || progressInFlight.current) return;
+      if (!restored.current || currentPhase.current === "done" || progressSync.isPending()) return;
       const currentQuestions = lesson.questions[currentPhase.current] || [];
-      progressInFlight.current = true;
-      void api
-        .progress(session.session_id, {
+      void progressSync.save({
           phase: currentPhase.current,
           question_id:
             currentQuestions[currentQuestionIndex.current]?.id || null,
@@ -338,11 +324,10 @@ function LessonRunner({
           active_time_ms: currentActiveSeconds.current * 1000,
           elapsed_time_ms: currentElapsed.current * 1000,
         })
-        .catch(() => setNotice("Progress is not saved yet. Check your connection."))
-        .finally(() => { progressInFlight.current = false; });
+        .catch(() => setNotice("Progress is not saved yet. Check your connection."));
     }, 5000);
     return () => window.clearInterval(t);
-  }, [session.session_id, lesson.questions]);
+  }, [session.session_id, lesson.questions, progressSync.save, progressSync.isPending]);
   useEffect(() => {
     setQuestionStartedAt(Date.now());
   }, [phase, questionIndex]);
@@ -361,8 +346,7 @@ function LessonRunner({
             const sectionId = progress?.section_id || "explain";
             setPhase("learn");
             setSection(sectionId);
-            void api
-              .progress(session.session_id, {
+            void progressSync.save({
                 phase: "learn",
                 question_id: null,
                 question_index: 0,
@@ -396,15 +380,17 @@ function LessonRunner({
         }
       })
       .catch(() => undefined);
-  }, [session.session_id]);
+  }, [session.session_id, progressSync.save]);
   useEffect(() => {
     if (phase === "done") camera.stop();
   }, [phase, camera.stop]);
   useEffect(() => {
     const t = window.setInterval(async () => {
+      if (!restored.current || currentPhase.current === "done" || signalInFlight.current) return;
+      signalInFlight.current = true;
+      try {
       const flushed = await flushOutbox();
       if (flushed.discarded) setNotice(`${flushed.discarded} queued event${flushed.discarded === 1 ? " was" : "s were"} discarded because the session no longer accepts them.`);
-      try {
         const result = await api.event(session.session_id, {
           client_event_id: crypto.randomUUID(),
           event_type: "signal_summary",
@@ -428,6 +414,8 @@ function LessonRunner({
         }
       } catch {
         setPendingEvents(outboxSize());
+      } finally {
+        signalInFlight.current = false;
       }
     }, 5000);
     return () => window.clearInterval(t);
@@ -472,7 +460,7 @@ function LessonRunner({
     nextIndex: number,
     nextSection = section,
   ) {
-    await api.progress(session.session_id, {
+    await progressSync.save({
       phase: nextPhase,
       question_id: nextQuestionId,
       question_index: nextIndex,
